@@ -1,0 +1,340 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hindi → Hinglish Converter</title>
+  <style>
+    :root { --bg: #0b1020; --card:#101933; --accent:#6ee7ff; --muted:#9fb4ff; --text:#eef2ff; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:linear-gradient(135deg,#0b1020 0%,#0b1b2e 60%,#0b1020 100%);color:var(--text)}
+    .container{max-width:1000px;margin:24px auto;padding:16px}
+    .title{font-size:clamp(22px,4vw,36px);font-weight:800;letter-spacing:.4px;margin:4px 0 12px}
+    .subtitle{color:#c7d2fe;margin-bottom:20px}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
+    .row{display:grid;grid-template-columns:1fr;gap:14px}
+    @media (min-width: 900px){.row{grid-template-columns:1fr 1fr}}
+    textarea{width:100%;min-height:240px;background:#0c1429;color:var(--text);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;resize:vertical;font-size:16px;line-height:1.6}
+    textarea[readonly]{opacity:.9}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+    .btn{background:#1f2b4d;border:1px solid rgba(255,255,255,.1);color:var(--text);padding:10px 14px;border-radius:12px;font-weight:600;cursor:pointer;transition:.2s}
+    .btn:hover{transform:translateY(-1px);border-color:var(--accent)}
+    .btn:active{transform:translateY(0)}
+    .select, .checkbox{background:#0c1429;color:var(--text);border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:12px}
+    .footer{opacity:.8;font-size:14px;margin-top:14px}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0c1429;border:1px solid rgba(255,255,255,.12);margin-left:8px;color:var(--muted)}
+    a{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title">Hindi → Hinglish Converter</div>
+    <div class="subtitle">Type or paste Hindi (Devanagari). Get instant Hinglish (Roman Hindi). Offline, private, no server.</div><div class="card">
+  <div class="controls">
+    <label>Vowel style:
+      <select id="vowelStyle" class="select">
+        <option value="simple">Simple (a, i, u, e, o)</option>
+        <option value="long">Mark long vowels (aa, ii, uu)</option>
+      </select>
+    </label>
+    <label>व (va/wa):
+      <select id="vaStyle" class="select">
+        <option value="v">Use "v"</option>
+        <option value="w">Use "w"</option>
+      </select>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="anusvaraM" /> Anusvara as "m" before labials
+    </label>
+    <span class="pill">Made for Sujal ⚡</span>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="hin">Hindi (Devanagari)</label>
+      <textarea id="hin" placeholder="उदाहरण: मैं आज स्कूल जा रहा हूँ।"></textarea>
+      <div class="controls">
+        <button class="btn" id="clear">Clear</button>
+        <button class="btn" id="sample">Sample</button>
+        <button class="btn" id="paste">Paste</button>
+      </div>
+    </div>
+    <div>
+      <label for="rom">Hinglish (Roman)</label>
+      <textarea id="rom" readonly placeholder="Main aaj school ja raha hoon."></textarea>
+      <div class="controls">
+        <button class="btn" id="copy">Copy</button>
+        <button class="btn" id="download">Download .txt</button>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Tip: This tool follows common Hinglish rules. Perfect accuracy for all conjuncts is hard; still, most text converts cleanly. 😊</div>
+</div>
+
+  </div><script>
+(function(){
+  const halant = "\u094D";
+  const anusvara = "\u0902"; // ं
+  const chandrabindu = "\u0901"; // ँ
+  const visarga = "\u0903"; // ः
+  const nukta = "\u093C"; // ़
+
+  const independentVowels = {
+    "\u0905":"a",  // अ
+    "\u0906":"aa", // आ
+    "\u0907":"i",  // इ
+    "\u0908":"ii", // ई
+    "\u0909":"u",  // उ
+    "\u090A":"uu", // ऊ
+    "\u090B":"ri", // ऋ
+    "\u0960":"rri",// ॠ
+    "\u090F":"e",  // ए
+    "\u0910":"ai", // ऐ
+    "\u0913":"o",  // ओ
+    "\u0914":"au"  // औ
+  };
+
+  const vowelMatras = {
+    "\u093E":"aa", // ा
+    "\u093F":"i",  // ि
+    "\u0940":"ii", // ी
+    "\u0941":"u",  // ु
+    "\u0942":"uu", // ू
+    "\u0943":"ri", // ृ
+    "\u0947":"e",  // े
+    "\u0948":"ai", // ै
+    "\u094B":"o",  // ो
+    "\u094C":"au"  // ौ
+  };
+
+  const consBase = {
+    "\u0915":"k",  // क
+    "\u0916":"kh", // ख
+    "\u0917":"g",  // ग
+    "\u0918":"gh", // घ
+    "\u0919":"ng", // ङ
+    "\u091A":"ch", // च
+    "\u091B":"chh",// छ
+    "\u091C":"j",  // ज
+    "\u091D":"jh", // झ
+    "\u091E":"ny", // ञ
+    "\u091F":"t",  // ट
+    "\u0920":"th", // ठ
+    "\u0921":"d",  // ड
+    "\u0922":"dh", // ढ
+    "\u0923":"n",  // ण
+    "\u0924":"t",  // त
+    "\u0925":"th", // थ
+    "\u0926":"d",  // द
+    "\u0927":"dh", // ध
+    "\u0928":"n",  // न
+    "\u092A":"p",  // प
+    "\u092B":"ph", // फ
+    "\u092C":"b",  // ब
+    "\u092D":"bh", // भ
+    "\u092E":"m",  // म
+    "\u092F":"y",  // य
+    "\u0930":"r",  // र
+    "\u0932":"l",  // ल
+    "\u0935":"v",  // व (optionally w)
+    "\u0936":"sh", // श
+    "\u0937":"sh", // ष
+    "\u0938":"s",  // स
+    "\u0939":"h"   // ह
+  };
+
+  const nuktaMap = {
+    "\u0958":"q",   // क़
+    "\u0959":"kh",  // ख़
+    "\u095A":"gh",  // ग़
+    "\u095B":"z",   // ज़
+    "\u095C":"r",   // ड़
+    "\u095D":"rh",  // ढ़
+    "\u095E":"f",   // फ़
+    "\u095F":"y"    // य़ (rare)
+  };
+
+  // utility: detect labial following for m/n decision (p, b, m, ph, bh)
+  function isLabialLatin(next){
+    return /^(p|b|m|ph|bh)/.test(next);
+  }
+
+  function transliterate(input, opts){
+    const { longVowels, useWForVa, anusvaraAsM } = opts;
+
+    // Resolve va style
+    const cons = { ...consBase };
+    cons["\u0935"] = useWForVa ? "w" : "v";
+
+    // helper to maybe shorten long vowels in simple mode
+    const vMapInd = { ...independentVowels };
+    const vMapMat = { ...vowelMatras };
+
+    if(!longVowels){
+      for(const k in vMapInd){ vMapInd[k] = vMapInd[k].replace(/aa|ii|uu/g, m => ({aa:'a',ii:'i',uu:'u'}[m])); }
+      for(const k in vMapMat){ vMapMat[k] = vMapMat[k].replace(/aa|ii|uu/g, m => ({aa:'a',ii:'i',uu:'u'}[m])); }
+    }
+
+    let out = '';
+    const chars = Array.from(input);
+
+    function peekLatinOfNext(i){
+      // very rough look-ahead: if next is consonant, return its latin base
+      const c = chars[i];
+      if(cons[c]) return cons[c];
+      // nukta precomposed
+      if(nuktaMap[c]) return nuktaMap[c];
+      return '';
+    }
+
+    for(let i=0;i<chars.length;i++){
+      const ch = chars[i];
+
+      // whitespace / punctuation: pass through
+      if(/\s/.test(ch) || /[\u0964\u0965\u0021-\u0040\u005B-\u0060\u007B-\u007E«»“”‘’…]/.test(ch)){
+        out += ch;
+        continue;
+      }
+
+      // independent vowels
+      if(vMapInd[ch]){ out += vMapInd[ch]; continue; }
+
+      // nukta precomposed letters
+      if(nuktaMap[ch]){ out += nuktaMap[ch]; continue; }
+
+      // consonants
+      if(cons[ch]){
+        let base = cons[ch];
+        // look ahead for nukta (rare combining) — if present, adjust
+        if(chars[i+1] === nukta){
+          // simple overrides for some base+nuqta combos
+          if(base === 'k') base = 'q';        // क + ़ ≈ क़
+          else if(base === 'kh') base = 'kh'; // ख़ stays kh
+          else if(base === 'g') base = 'gh';  // ग़
+          else if(base === 'j') base = 'z';   // ज़ (approx for ज + ़)
+          else if(base === 'd') base = 'r';   // ड़ → r
+          else if(base === 'dh') base = 'rh'; // ढ़ → rh
+          else if(base === 'ph') base = 'f';  // फ़
+          i++; // consume nukta
+        }
+
+        // check for conjuncts we want to special-case
+        const next = chars[i+1];
+        const next2 = chars[i+2];
+        if(next === halant && next2 === '\u0937'){ // क्ष
+          out += 'ksh';
+          i += 2;
+          continue;
+        }
+        if(next === halant && next2 === '\u0930'){ // त्र, श्र handled depending base
+          if(base === 't') { out += 'tr'; i += 2; continue; }
+          if(base === 'sh'){ out += 'shr'; i += 2; continue; }
+        }
+        if(base === 'j' && next === halant && next2 === '\u091E'){ // ज्ञ
+          out += 'gya'; i += 2; continue;
+        }
+
+        // now handle matras / halant
+        let latin = base;
+        if(chars[i+1] === halant){
+          // pure consonant, no inherent vowel
+          out += latin;
+          i += 1; // skip halant
+          continue;
+        }
+        // check for a matra
+        const m = vMapMat[chars[i+1]];
+        if(m){
+          latin += m;
+          i += 1; // consume matra
+        } else {
+          // inherent 'a'
+          latin += (longVowels ? 'a' : 'a'); // same, but kept for clarity
+        }
+        out += latin;
+        continue;
+      }
+
+      // signs
+      if(ch === anusvara || ch === chandrabindu){
+        // decide m/n using next latin hint if enabled
+        if(anusvaraAsM){
+          const hint = peekLatinOfNext(i+1);
+          out += isLabialLatin(hint) ? 'm' : 'n';
+        } else {
+          out += 'n';
+        }
+        continue;
+      }
+      if(ch === visarga){ out += 'h'; continue; }
+
+      // digits (Devanagari to Arabic)
+      if(/[\u0966-\u096F]/.test(ch)){
+        out += String(ch.codePointAt(0) - 0x0966);
+        continue;
+      }
+
+      // default: pass-through
+      out += ch;
+    }
+
+    // simple cleanup: collapse multiple spaces
+    out = out.replace(/\u00A0/g,' ').replace(/\s{2,}/g,' ');
+    return out;
+  }
+
+  // DOM wiring
+  const hin = document.getElementById('hin');
+  const rom = document.getElementById('rom');
+  const clearBtn = document.getElementById('clear');
+  const sampleBtn = document.getElementById('sample');
+  const pasteBtn = document.getElementById('paste');
+  const copyBtn = document.getElementById('copy');
+  const downloadBtn = document.getElementById('download');
+  const vowelStyle = document.getElementById('vowelStyle');
+  const vaStyle = document.getElementById('vaStyle');
+  const anusvaraM = document.getElementById('anusvaraM');
+
+  function run(){
+    const text = hin.value;
+    const out = transliterate(text, {
+      longVowels: vowelStyle.value === 'long',
+      useWForVa: vaStyle.value === 'w',
+      anusvaraAsM: anusvaraM.checked,
+    });
+    rom.value = out;
+  }
+
+  ['input','change'].forEach(ev=>{
+    hin.addEventListener(ev, run);
+    vowelStyle.addEventListener(ev, run);
+    vaStyle.addEventListener(ev, run);
+    anusvaraM.addEventListener(ev, run);
+  });
+
+  clearBtn.addEventListener('click', ()=>{ hin.value=''; run(); hin.focus(); });
+  sampleBtn.addEventListener('click', ()=>{
+    hin.value = `मैं आज बहुत खुश हूँ, क्योंकि मुझे एक नई ऐप मिली है।\nतुम कहाँ जा रहे हो? मैं स्कूल जा रहा हूँ!\nभारत एक महान देश है।`;
+    run();
+  });
+  pasteBtn.addEventListener('click', async ()=>{
+    try{
+      const t = await navigator.clipboard.readText();
+      if(t){ hin.value = t; run(); }
+    }catch(e){ alert('Clipboard access not allowed by browser. Long press → Paste.'); }
+  });
+  copyBtn.addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(rom.value); copyBtn.textContent='Copied!'; setTimeout(()=>copyBtn.textContent='Copy',1200);}catch(e){ alert('Copy failed. Select text and copy manually.'); }
+  });
+  downloadBtn.addEventListener('click', ()=>{
+    const blob = new Blob([rom.value], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'hinglish.txt'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // init
+  run();
+})();
+</script></body>
+</html>
